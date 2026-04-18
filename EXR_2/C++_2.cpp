@@ -1,132 +1,141 @@
 #include <iostream>
 #include <vector>
-#include <cmath>
-#include <random>
-#include <iomanip>
+#include <random>   // для генерации случайных чисел
+#include <iomanip>  // для красивого вывода таблицы
 #include <string>
 
 using namespace std;
 
-// Используем стандартный 64-битный тип
+// Используем long long, чтобы работать с большими числами (до 64 бит)
 typedef unsigned long long uint64;
 
-// 1. Решето Эратосфена до 500
-vector<int> sieve_500() {
-    vector<int> primes;
-    vector<bool> is_prime(501, true);
-    is_prime[0] = is_prime[1] = false;
-    for (int p = 2; p * p <= 500; p++) {
-        if (is_prime[p]) {
-            for (int i = p * p; i <= 500; i += p)
-                is_prime[i] = false;
-        }
-    }
-    for (int p = 2; p <= 500; p++) {
-        if (is_prime[p]) primes.push_back(p);
-    }
-    return primes;
-}
-
-// Безопасное умножение по модулю (чтобы не было переполнения)
-uint64 safe_mul(uint64 a, uint64 b, uint64 m) {
-    uint64 res = 0;
-    a %= m;
-    while (b > 0) {
-        if (b % 2 == 1) res = (res + a) % m;
-        a = (a * 2) % m;
-        b /= 2;
-    }
-    return res;
-}
-
-// Быстрое возведение в степень по модулю
-uint64 mod_pow(uint64 base, uint64 exp, uint64 mod) {
+// --- ФУНКЦИЯ ДЛЯ ВОЗВЕДЕНИЯ В СТЕПЕНЬ ПО МОДУЛЮ ---
+// Нужно для теста на простоту, чтобы не было переполнения
+uint64 mod_pow(uint64 base, uint64 exp, uint64 m) {
     uint64 res = 1;
-    base %= mod;
+    base %= m;
     while (exp > 0) {
-        if (exp % 2 == 1) res = safe_mul(res, base, mod);
-        base = safe_mul(base, base, mod);
+        if (exp % 2 == 1) res = (__int128)res * base % m; // __int128 защищает от ошибок при умножении
+        base = (__int128)base * base % m;
         exp /= 2;
     }
     return res;
 }
 
-// Шаг 6: Проверка теоремы Диемитко
-bool check_gost(uint64 p, uint64 q, uint64 N, uint64 u) {
-    if (p <= 1) return false;
-    // 1) 2^(p-1) == 1 (mod p)
-    if (mod_pow(2, p - 1, p) != 1) return false;
-    // 2) 2^(N+u) != 1 (mod p)
-    if (mod_pow(2, N + u, p) == 1) return false;
-    return true;
-}
+// --- ШАГ 5 и 6: ТЕСТ МИЛЛЕРА-РАБИНА ---
+// Проверяет, является ли число n простым. t — количество проверок (надежность)
+bool is_prime(uint64 n, int t) {
+    if (n < 2) return false;
+    if (n == 2 || n == 3) return true;
+    if (n % 2 == 0) return false;
 
-// 2. Генерация простого числа
-uint64 generate_gost_prime(int bits, uint64 q, int& rejected) {
-    random_device rd;
-    mt19937_64 gen(rd());
-    
-    // Граница 2^(bits-1)
-    uint64 min_val = 1ULL << (bits - 1);
-    uint64 max_val = (bits == 64) ? 0xFFFFFFFFFFFFFFFFULL : (1ULL << bits) - 1;
+    // Параметры теста Миллера-Рабина
+    uint64 d = n - 1;
+    while (d % 2 == 0) d /= 2;
 
-    while (true) {
-        // Вычисляем стартовое N
-        uint64 N_start = min_val / q;
-        uniform_int_distribution<uint64> dist(0, N_start);
-        uint64 N = N_start + dist(gen);
+    for (int i = 0; i < t; i++) {
+        uint64 a = 2 + rand() % (n - 3); // Выбираем случайное основание
+        uint64 x = mod_pow(a, d, n);
+        if (x == 1 || x == n - 1) continue;
         
-        if (N % 2 != 0) N++; // N должно быть четным
-
-        uint64 u = 0;
-        // Ограничиваем цикл, чтобы не уйти в бесконечность
-        for (int attempt = 0; attempt < 1000; attempt++) {
-            uint64 p = (N + u) * q + 1;
-            
-            // Если вышли за разрядность
-            if (p > max_val || p < min_val) break;
-
-            if (check_gost(p, q, N, u)) return p;
-
-            rejected++;
-            u += 2;
+        bool composite = true;
+        // Дополнительные проверки (Шаг 6 по заданию)
+        for (uint64 r = d; r < n - 1; r *= 2) {
+            x = (__int128)x * x % n;
+            if (x == n - 1) { composite = false; break; }
         }
+        if (composite) return false;
     }
+    return true;
 }
 
 int main() {
     setlocale(LC_ALL, "Russian");
-    
+
+    // --- ШАГ 1: РЕШЕТО ЭРАТОСФЕНА (упрощенно) ---
+    vector<int> small_primes;
+    for (int i = 2; i <= 500; i++) {
+        bool simple = true;
+        for (int j = 2; j * j <= i; j++) {
+            if (i % j == 0) { simple = false; break; }
+        }
+        if (simple) small_primes.push_back(i);
+    }
+
+    // ВХОДНЫЕ ДАННЫЕ
     int bits;
-    cout << "Введите разрядность (рекомендуется 32-60): ";
+    cout << "Введите разрядность (например, 10 или 16): ";
     cin >> bits;
 
-    if (bits > 62) {
-        cout << "Ошибка: стандартный uint64 не потянет больше 62 бит для этого алгоритма." << endl;
-        return 1;
-    }
+    // Настройка генератора случайных чисел
+    random_device rd;
+    mt19937_64 gen(rd());
+    uint64 min_val = 1ULL << (bits - 1); // Минимальное число заданной разрядности
+    uint64 max_val = (1ULL << bits) - 1; // Максимальное число заданной разрядности
+    uniform_int_distribution<uint64> dist(min_val, max_val);
 
-    vector<int> small_primes = sieve_500();
-    // q должно быть примерно в два раза меньше p по разрядности (из текста ГОСТ)
-    uint64 q = 1000003; 
+    // Структура для хранения данных одного столбца таблицы
+    struct Result { 
+        uint64 number; 
+        string status; 
+        int rejected; 
+    };
+    vector<Result> table;
 
-    cout << "\nРезультаты выполнения тестов (ГОСТ Р 34.10-94):\n";
-    cout << "----------------------------------------------------------------------\n";
-    cout << " №  | Простое число           | Результат теста | rejected\n";
-    cout << "----------------------------------------------------------------------\n";
-
+    // --- ШАГ 3: ЦИКЛ ДЛЯ ПОСТРОЕНИЯ 10 ЧИСЕЛ ---
     for (int i = 1; i <= 10; i++) {
         int rejected = 0;
-        uint64 p = generate_gost_prime(bits, q, rejected);
-        
-        // Повторная проверка для колонки "Результат"
-        bool is_p = check_gost(p, q, (p - 1) / q, 0);
+        uint64 candidate;
 
-        cout << left << setw(3) << i << " | " 
-             << left << setw(23) << p << " | " 
-             << left << setw(14) << (is_p ? "true" : "false") << " | " 
-             << rejected << endl;
+        while (true) {
+            candidate = dist(gen); // Генерируем случайное число
+
+            // Проверка делимости на малые простые числа из Шага 1
+            bool div_by_small = false;
+            for (int p : small_primes) {
+                if (candidate % p == 0 && candidate != p) {
+                    div_by_small = true;
+                    break;
+                }
+            }
+
+            if (div_by_small) {
+                rejected++; // Увеличиваем счетчик rejected (Шаг 5.а)
+                continue;
+            }
+
+            // ШАГ 5: Проверка основным тестом
+            if (is_prime(candidate, 1)) {
+                // ШАГ 6: Дополнительная проверка с параметром t=2
+                bool final_check = is_prime(candidate, 2);
+                table.push_back({candidate, final_check ? "true" : "false", rejected});
+                break;
+            } else {
+                rejected++; // Не прошло тест — в мусор
+            }
+        }
     }
+
+    // --- ВЫВОД РЕЗУЛЬТАТОВ (ТАБЛИЦА 2) ---
+    cout << "\nРезультаты выполнения тестов (Таблица 2)\n";
+    string border = "-----------------------------------------------------------------------------------------";
+    
+    cout << border << endl;
+    cout << "| " << left << setw(18) << "№" << " |";
+    for (int i = 1; i <= 10; i++) cout << setw(5) << i << " |";
+    cout << "\n" << border << endl;
+
+    cout << "| " << left << setw(18) << "Простое число" << " |";
+    for (auto item : table) cout << setw(5) << item.number << " |";
+    cout << "\n" << border << endl;
+
+    cout << "| " << left << setw(18) << "Результат" << " |";
+    for (auto item : table) cout << setw(5) << (item.status == "true" ? "tr" : "fl") << " |";
+    cout << "\n" << border << endl;
+
+    cout << "| " << left << setw(18) << "rejected" << " |";
+    for (auto item : table) cout << setw(5) << item.rejected << " |";
+    cout << "\n" << border << endl;
 
     return 0;
 }
