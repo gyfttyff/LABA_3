@@ -1,40 +1,27 @@
 #include <iostream>
 #include <vector>
-#include <numeric>
+#include <numeric> // Для std::gcd Наибольшего общего делителя
+#include <cmath>   // Для std::pow Степени числа
 
 using namespace std;
 
 typedef long long ll;
 
-// Функция для нахождения НОД (наибольшего общего делителя)
-ll gcd(ll a, ll b) {
-    while (b) {
-        a %= b;
-        swap(a, b);
-    }
-    return a;
-}
-
-// Возведение в степень
-ll power(ll base, ll exp) {
-    ll res = 1;
-    for (int i = 0; i < exp; i++) res *= base;
-    return res;
-}
-
 int main() {
     ll a, b;
-    if (!(cin >> a >> b)) return 0;
+    cout << endl;
+    cout << "Введите a и b: ";
+    cin >> a >> b;
+    cout << endl;
 
-    // Если b = 1, ряд расходится
-    if (b == 1) {
+    // Проверка на расходимость
+    if (b == 1) { //  Ряд сходится только тогда, когда основание знаменателя |b| > 1. Если b = 1, то каждое слагаемое это бесконечная сумма
         cout << "infinity" << endl;
         return 0;
     }
 
-    // Вычисляем числа Эйлера A(n, k) через динамическое программирование
-    // A(n, k) = (n-k)*A(n-1, k-1) + (k+1)*A(n-1, k)
-    vector<vector<ll>> euler(a + 1, vector<ll>(a, 0));
+    // числа Эйлера A(a, k)
+    vector<vector<ll>> euler(a + 1, vector<ll>(a + 1, 0));
     euler[0][0] = 1;
 
     for (int n = 1; n <= a; ++n) {
@@ -45,18 +32,21 @@ int main() {
         }
     }
 
-    // Числитель: sum_{k=0}^{a-1} ( A(a, k) * b^(a-k) )
+    // Считаем числитель 
     ll num = 0;
     for (int k = 0; k < a; ++k) {
-        num += euler[a][k] * power(b, a - k);
+        // Нам нужно привести результат pow к long long
+        num += euler[a][k] * (ll)pow(b, a - k);
     }
+    // Это знаменатель			
+    ll den = (ll)pow(b - 1, a + 1);
 
-    // Знаменатель: (b-1)^(a+1)
-    ll den = power(b - 1, a + 1);
-
-    // Сокращаем дробь
-    ll common = gcd(num, den);
-    cout << num / common << "/" << den / common << endl;
+    // 4. Сокращаем дробь, используя встроенный std::gcd из <numeric>
+    ll common = gcd(num, den); 
+    
+    cout << num / common << "/" << den / common << endl; 
+    cout << endl;
 
     return 0;
 }
+
