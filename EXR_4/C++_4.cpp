@@ -38,7 +38,7 @@ int main() {
 
             if (current_sum > max_score) {
                 max_score = current_sum;
-                chosen_k = k;
+                chose_kam = k;
             }
         }
 
